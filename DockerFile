@@ -9,9 +9,8 @@ WORKDIR C:/Users/ASUS/Desktop/Erasmus Masters/SA/project
 #to COPY the remote file at working directory in container
 COPY analyzer.py ./
 # Now the structure looks like this '/usr/app/src/test.py'
-
-
+RUN pip install paho-mqtt
 #CMD instruction should be used to run the software
 #contained by your image, along with any arguments.
 
-CMD [ "python", "./test.py"]
+CMD [ "python", "./analyzer.py"]
