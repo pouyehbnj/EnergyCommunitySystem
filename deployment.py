@@ -102,7 +102,7 @@ def deploy_model(model:ShallowRegressionLSTM,row:int,s_l):
 def paho_client():
     # CLIENT PAHO
     port = 1883
-    username = 'agricultureLove'
+    username = 'mosquittoBroker'
     password = 'se4gd'
     client_id = f'Solar_Client'
     client = paho.Client(client_id)
@@ -138,7 +138,7 @@ def energyConsumption(date:datetime,sizeInSqm=0,people=1):
     start = (AVERAGE_MONTHLY//2)-(AVERAGE_MONTHLY//2*(people-1))
     end = AVERAGE_MONTHLY+(AVERAGE_MONTHLY//2*(people-1))
     print(start,end)
-    x = np.arange(start, end, (end-start)/12)
+    x = np.arange(start, end, (end-start)/5)
     x = np.roll(x,6)
     x = pdf(x)
     month = date.month
@@ -147,6 +147,7 @@ def energyConsumption(date:datetime,sizeInSqm=0,people=1):
     start = (hourlyEnergy_x//12)
     end = ((hourlyEnergy_x*2))
     hourlyEnergy = np.arange(start,end,(end-start)/24)
+    hourlyEnergy = np.roll(hourlyEnergy,3)
     hourlyEnergy = pdf(hourlyEnergy)
     return hourlyEnergy[date.hour-1]
 def main():
