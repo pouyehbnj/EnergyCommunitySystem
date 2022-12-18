@@ -22,8 +22,9 @@ client.connect("127.0.0.1", 1883, 60)
 # Blocking call that processes network traffic, dispatches callbacks and
 # handles reconnecting.
 # Other loop*() functions are available that give a threaded interface and a
-# manual interface.
-client.loop_start()
-time.sleep(4)
-client.loop_stop()
+# # manual interface.
+# client.loop_start()
+# time.sleep(4)
+# client.loop_stop()
+client.loop_forever()
 # test
