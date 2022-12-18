@@ -1,4 +1,5 @@
 from datetime import datetime
+import json
 import sys
 import time
 import torch
@@ -96,7 +97,7 @@ def deploy_model(model:ShallowRegressionLSTM,row:int,s_l):
     [x,y_sol,y_win] = dataset_test[row]
     model.eval()
     prediction = model(torch.unsqueeze(x,dim=0))
-    return datetime_object,prediction.detach().numpy()[0],y_sol.detach().numpy(),y_win.detach().numpy()
+    return datetime_object.strftime("%m/%d/%Y, %H:%M:%S"),prediction.detach().numpy()[0],y_sol.detach().numpy(),y_win.detach().numpy()
 
 def paho_client():
     # CLIENT PAHO
@@ -124,6 +125,7 @@ def energyProduction(i,model,amountOfSolarPanels=10):
     return [date,prediction_sol*SOLAR_PANEL_PRODUCTION]
     
 def energyConsumption(date:datetime,sizeInSqm=0,people=1):
+    date = datetime.strptime(date,"%m/%d/%Y, %H:%M:%S")
     # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC8847370/
     AVERAGE_MONTHLY = 4000000/12
     if(people>1):
@@ -161,9 +163,10 @@ def main():
         time.sleep(1)
         [dateForI,solar] = energyProduction(i,solar_model)
         consumption = energyConsumption(dateForI)
-        print(solar,consumption)
-        solar_publish = {"solar":solar,"timestamp":dateForI}
-        consumption_publish = {"consumption":solar,"timestamp":dateForI}
+        print(f"Date:{dateForI}, Production: {solar}, Consumption:{consumption}")
+        solar_publish = json.dumps({"production":solar,"timestamp":dateForI})
+        consumption_publish = json.dumps({"consumption":solar,"timestamp":dateForI})
         client.publish("prediction/production",solar_publish)
         client.publish("prediction/consumption",consumption_publish)
         i=i+1
+main()
