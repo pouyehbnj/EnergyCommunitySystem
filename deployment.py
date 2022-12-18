@@ -6,7 +6,6 @@ import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 import pandas as pd
 import numpy as np
-from matplotlib import pyplot as plt
 import paho.mqtt.client as paho
 
 class weatherDataset(Dataset):
