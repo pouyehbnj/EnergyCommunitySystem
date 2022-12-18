@@ -119,7 +119,7 @@ def paho_client():
 def energyProduction(i,model,amountOfSolarPanels=10):
     #Most residential solar panels on today's market are rated to produce between 250 and 400 watts each per hour (kwh).
     SOLAR_PANEL_PRODUCTION = 400*amountOfSolarPanels
-    [date,prediction_sol,y_sol,_y_win] = deploy_model(solar_model,i,48)
+    [date,prediction_sol,y_sol,_y_win] = deploy_model(model,i,48)
     if(prediction_sol<0):
         prediction_sol=0
     return [date,prediction_sol*SOLAR_PANEL_PRODUCTION]
