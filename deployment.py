@@ -1,5 +1,6 @@
 from datetime import datetime
 import json
+import math
 import sys
 import time
 import torch
@@ -8,30 +9,25 @@ from torch.utils.data import Dataset, DataLoader
 import pandas as pd
 import numpy as np
 import paho.mqtt.client as paho
+import matplotlib.pyplot as plt
 
 class weatherDataset(Dataset):
-    """My own Weather Dataset"""
+    """
+    The Dataset implements the Dataset Pytorch class, including itemgetter, len and intialization.
+    Additionally, dates can be requested using the get_date class method.
+    """
 
     def __init__(self, csv_file,sequence_len,device):
         self.device = device
         dataset = pd.read_csv(csv_file, header=0)
         self.time = dataset["time"]
         dataset = dataset.drop(columns="time")
-        #a = dataset.reset_index(drop=True, inplace=True)     
-        #print(a)   
         dataset = dataset.values
         self.sequence_length = sequence_len
-
-        # for data in dataset:
-        #     newData += ([eval(i) for i in data])
-        #dataset = ((newData-newData.mean())/newData.std())
         dataset_tens = torch.tensor(dataset, dtype=torch.float)
         self.norm_data = dataset_tens[:,2:].clone().detach()
         self.solar = dataset_tens[:,0].clone().detach()
         self.wind = dataset_tens[:,1].clone().detach()
-        # self.norm_data = X / X.max(0, keepdim=True)[0]
-        # self.solar = weatherData_y_solar / weatherData_y_solar.max(0, keepdim=True)[0]
-        # self.wind = weatherData_y_wind / weatherData_y_wind.max(0, keepdim=True)[0]
 
     def __len__(self):
         return len(self.norm_data)
@@ -54,6 +50,12 @@ class weatherDataset(Dataset):
         return sample
 
 class ShallowRegressionLSTM(nn.Module):
+    """
+    The ShallowRegressionLSTM implements the nn.Module class from Pytorch. 
+    Number of features are the amount of input features for the LSTM, Hidden Units describes the 
+    size of the Networks layers and the device can be changed between CPU and GPU (when Cuda is available)
+    This LSTM is a Shallow LSTM implementing only a single Network (num_layers=1)
+    """
     def __init__(self, num_features, hidden_units, device):
         super().__init__()
         self.device = device
@@ -124,7 +126,7 @@ def energyProduction(i,model,amountOfSolarPanels=10):
         prediction_sol=0
     return [date,prediction_sol*SOLAR_PANEL_PRODUCTION]
     
-def energyConsumption(date:datetime,sizeInSqm=0,people=1):
+def energyConsumption(date:datetime,sizeInSqm=0,people=4):
     date = datetime.strptime(date,"%m/%d/%Y, %H:%M:%S")
     # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC8847370/
     AVERAGE_MONTHLY = 4000000/12
@@ -137,27 +139,32 @@ def energyConsumption(date:datetime,sizeInSqm=0,people=1):
         return y_out
     start = (AVERAGE_MONTHLY//2)-(AVERAGE_MONTHLY//2*(people-1))
     end = AVERAGE_MONTHLY+(AVERAGE_MONTHLY//2*(people-1))
-    print(start,end)
-    x = np.arange(start, end, (end-start)/5)
+    x = np.arange(start, end, (end-start)/12)
     x = np.roll(x,6)
     x = pdf(x)
     month = date.month
     dailyEnergy = x[month-1]/30
     hourlyEnergy_x = (dailyEnergy/24)
-    start = (hourlyEnergy_x//12)
-    end = ((hourlyEnergy_x*2))
-    hourlyEnergy = np.arange(start,end,(end-start)/24)
-    hourlyEnergy = np.roll(hourlyEnergy,3)
-    hourlyEnergy = pdf(hourlyEnergy)
-    return hourlyEnergy[date.hour-1]
+    # start = (hourlyEnergy_x//12)
+    # end = ((hourlyEnergy_x*2))
+    # print(start,end)
+    # hourlyEnergy = np.arange(start,end,(end-start)/24)
+    # print(hourlyEnergy)
+    #hourlyEnergy = np.roll(hourlyEnergy,12)
+    #hourlyEnergy = pdf(hourlyEnergy)
+    x = date.hour-1
+    y = hourlyEnergy_x*(-math.sin(x*(math.pi/6))+1)
+    return y
 def main():
-    i=24
+    i=3938
     simulation_len = len(pd.read_csv("Testing_Set.csv", header=0))
     solar_model = ShallowRegressionLSTM(30,32,"cpu")
     stateDict_sol = torch.load("solar_model_bigger.pt",map_location=torch.device('cpu'))
     solar_model.load_state_dict(stateDict_sol)
     solar_model.eval()
     client = paho_client()
+    arr_con = []
+    arr_prod = []
     while(True):
         if(i>=simulation_len-1):
                 i=0
@@ -167,7 +174,18 @@ def main():
         print(f"Date:{dateForI}, Production: {solar}, Consumption:{consumption}")
         solar_publish = json.dumps({"production":solar,"timestamp":dateForI})
         consumption_publish = json.dumps({"consumption":solar,"timestamp":dateForI})
+        arr_con.append(consumption)
+        arr_prod.append(solar)
         client.publish("prediction/production",solar_publish)
         client.publish("prediction/consumption",consumption_publish)
         i=i+1
+    x = np.arange(len(arr_con))
+    plt.plot(x,arr_con,label="consumption")
+    plt.plot(x,arr_prod,label="production")
+    plt.xlabel("time of the day in hours")
+    plt.ylabel("energy")
+    plt.legend()
+    plt.show()
+
+    
 main()
