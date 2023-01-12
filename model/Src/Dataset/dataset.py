@@ -8,7 +8,7 @@ from torch.utils.data import Dataset, DataLoader
 import numpy as np
 
 class weatherDataset(Dataset):
-    """My own Weather Dataset"""
+    """Weather Dataset using date function for better handling time series data"""
 
     def __init__(self, csv_file,sequence_len,device):
         self.device = device
@@ -52,6 +52,8 @@ class weatherDataset(Dataset):
         return sample
 
 class ShallowRegressionLSTM(nn.Module):
+    """Shallow Regression Long Short Term Memory Model using the nn.Module from Pytorch as a parent, following the pytorch standard"""
+    
     def __init__(self, num_features, hidden_units, device):
         super().__init__()
         self.device = device
@@ -83,8 +85,10 @@ class ShallowRegressionLSTM(nn.Module):
         out = self.fc(out) #Fin
         out = self.linear(out).flatten()
         return out
-        
+
+
 def train_model(data_loader, model, loss_function, optimizer):
+    """Training Function that uses a dataloader and pytorch model to train the model with a loss function and optimaze the parameters consistently """
     num_batches = len(data_loader)
     total_loss = 0
     model.train(True)
@@ -112,6 +116,7 @@ def train_model(data_loader, model, loss_function, optimizer):
     return avg_loss
 
 def test_model(data_loader, model, loss_function):
+    """Testing function for the model using torch.no_grad() to stop adapting the weights in the network"""
     num_batches = len(data_loader)
     total_loss = 0
     i = 0
@@ -135,7 +140,7 @@ def test_model(data_loader, model, loss_function):
     return avg_loss
 
 def main():
-    ### Load the data
+    ## seeding for same results
     torch.manual_seed(103)
 
     if torch.cuda.is_available(): 
@@ -143,48 +148,54 @@ def main():
     else: 
         dev = "cpu" 
     device = torch.device(dev) 
-    #print(f"Training on device: {device}")
+
+    #Setting Training Parameters  - Adapted by manual trainign - Optimizer could be used in future
+
     BATCH_SIZE = 64
     SEQUENCE_LEN = 48
     LEARNING_RATE = 0.0001
     HIDDEN_SIZE = 32
     NUM_FEATURES = 30
 
+    # Load Data and put in pytorch dataloader
+
     w_dataset_train = weatherDataset("Data/Training_Set.csv",SEQUENCE_LEN,device)
     w_dataset_test = weatherDataset("Data/Testing_Set.csv",SEQUENCE_LEN,device)
-    # train_size = int(0.8 * len(chessDataset))
-    # test_size = len(chessDataset) - train_size
-    # train_set, val_set = torch.utils.data.random_split(chessDataset, [train_size, test_size])
-    #print(len(train_set.dataset))
 
     dataloader_train = DataLoader(w_dataset_train, batch_size=BATCH_SIZE, shuffle=True)
     dataloader_test = DataLoader(w_dataset_test, batch_size=BATCH_SIZE, shuffle=True)
     #dataloader_test = DataLoader(val_set, batch_size=BATCH_SIZE, shuffle=True,drop_last=True)
 
+    # Initialize model for training
     model = ShallowRegressionLSTM(num_features=NUM_FEATURES, hidden_units=HIDDEN_SIZE,device=device).to(device)
     loss_function = nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
-    #Main optimization loop
-    running_accuracy = []
-    myMSE = list()
-    nums = list()
+    # variables not currently in use
+    # running_accuracy = []
+    # myMSE = list()
+    # nums = list()
+
     # Loop over epochs
     i = 0
-
     print("Untrained test\n--------")
     #Test loss: 0.3402042749666074
     arr_0 = test_model(dataloader_test, model, loss_function)
     arr_train = []
     arr_test = []
+
+    # Training/Testing Loop
     for ix_epoch in range(30):
         print(f"Epoch {ix_epoch}\n---------")
         #print(f"\n\n{len(arr_train)}\n\n")
         arr_train.append(train_model(dataloader_train, model, loss_function, optimizer=optimizer))
         arr_test.append(test_model(dataloader_test, model, loss_function))
+
     solar_prediction = []
     solar = []
     date_arr = []
     model.eval()
+
+    # Evaluating against real data and plotting
     for i in range(30):
         [x,y_sol,y_win] = w_dataset_test[i]
         date_i = w_dataset_test.get_date(i)
@@ -192,6 +203,7 @@ def main():
         solar.append(y_sol.detach().cpu().numpy())
         date_arr.append(date_i)
         solar_prediction.append(prediction.detach().cpu().numpy()[0])
+        
     dict = {'date': date_arr, 'y_sol': solar, 'prediction_sol': solar_prediction} 
     df = pd.DataFrame(dict)
     plt.plot(df["date"], df["y_sol"],label="Real Solar",linewidth=0.5)

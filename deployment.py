@@ -56,7 +56,9 @@ class ShallowRegressionLSTM(nn.Module):
     size of the Networks layers and the device can be changed between CPU and GPU (when Cuda is available)
     This LSTM is a Shallow LSTM implementing only a single Network (num_layers=1)
     """
+
     def __init__(self, num_features, hidden_units, device):
+        """Initialize LSTM with number of features, hidden units and the selcted device"""
         super().__init__()
         self.device = device
         self.num_sensors = num_features  # this is the number of features
@@ -76,6 +78,8 @@ class ShallowRegressionLSTM(nn.Module):
         self.linear = nn.Linear(in_features=16, out_features=1)
 
     def forward(self, x):
+        """push the values through the system without performing a backpropagation"""
+
         batch_size = x.shape[0]
         h0 = torch.zeros(self.num_layers, batch_size, self.hidden_units).requires_grad_().to(self.device)
         c0 = torch.zeros(self.num_layers, batch_size, self.hidden_units).requires_grad_().to(self.device)
@@ -88,10 +92,11 @@ class ShallowRegressionLSTM(nn.Module):
         out = self.linear(out).flatten()
         return out
 
-# def denorm(val,min,max):
-# return (val+min)*(max-min)
+
 def deploy_model(model:ShallowRegressionLSTM,row:int,s_l):
-    SEQUENCE_LEN = s_l # 7 hours needed for 1 hour prediction
+    """Selects the device and instantiates and loads the model for prediction from a selected file. 
+    Afterwards, a starting data is picked and the model can be deployed to do the prediction"""
+    SEQUENCE_LEN = s_l 
     device = torch.device("cpu")
     dataset_test = weatherDataset("Testing_Set.csv",SEQUENCE_LEN,device)
     date = dataset_test.get_date(row)
@@ -102,6 +107,7 @@ def deploy_model(model:ShallowRegressionLSTM,row:int,s_l):
     return datetime_object.strftime("%m/%d/%Y, %H:%M:%S"),prediction.detach().numpy()[0],y_sol.detach().numpy(),y_win.detach().numpy()
 
 def paho_client():
+    """Instatiate a PAHO client witht the methods used from the PAHO website, using localhost as the host"""
     # CLIENT PAHO
     port = 1883
     username = 'mosquittoBroker'
@@ -116,10 +122,9 @@ def paho_client():
         print("connected")
     client.publish("Agriculture/solar",1)
     return client
-    #client.disconnect()
 
 def energyProduction(i,model,amountOfSolarPanels=10):
-    #Most residential solar panels on today's market are rated to produce between 250 and 400 watts each per hour (kwh).
+    """Calculate the Produced Energy from the amount of solar panels and the model prediction"""
     SOLAR_PANEL_PRODUCTION = 400*amountOfSolarPanels
     [date,prediction_sol,y_sol,_y_win] = deploy_model(model,i,48)
     if(prediction_sol<0):
@@ -127,12 +132,14 @@ def energyProduction(i,model,amountOfSolarPanels=10):
     return [date,prediction_sol*SOLAR_PANEL_PRODUCTION]
     
 def energyConsumption(date:datetime,sizeInSqm=0,people=4):
+    """Calculate the Consumed Energy from the amount of solar panels and the model prediction"""
     date = datetime.strptime(date,"%m/%d/%Y, %H:%M:%S")
     # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC8847370/
     AVERAGE_MONTHLY = 4000000/12
     if(people>1):
         AVERAGE_MONTHLY+=(AVERAGE_MONTHLY//2)*(people-1)
     def pdf(x):
+        """Normalization"""
         mean = np.mean(x)
         std = np.std(x)
         y_out = (std * np.sqrt(2 * np.pi)) * np.exp( - (x - mean)**2 / (2 * std**2))
@@ -145,17 +152,11 @@ def energyConsumption(date:datetime,sizeInSqm=0,people=4):
     month = date.month
     dailyEnergy = x[month-1]/30
     hourlyEnergy_x = (dailyEnergy/24)
-    # start = (hourlyEnergy_x//12)
-    # end = ((hourlyEnergy_x*2))
-    # print(start,end)
-    # hourlyEnergy = np.arange(start,end,(end-start)/24)
-    # print(hourlyEnergy)
-    #hourlyEnergy = np.roll(hourlyEnergy,12)
-    #hourlyEnergy = pdf(hourlyEnergy)
     x = date.hour-1
     y = hourlyEnergy_x*(-math.sin(x*(math.pi/6))+1)
     return y
 def main():
+    # can be picked at random and is the starting point of the simulation using the testing set
     i=3938
     simulation_len = len(pd.read_csv("Testing_Set.csv", header=0))
     solar_model = ShallowRegressionLSTM(30,32,"cpu")
@@ -165,6 +166,7 @@ def main():
     client = paho_client()
     arr_con = []
     arr_prod = []
+    # Starting the true loop with the paaho client that continues as long as the city runs
     while(True):
         if(i>=simulation_len-1):
                 i=0
@@ -179,13 +181,15 @@ def main():
         client.publish("prediction/production",solar_publish)
         client.publish("prediction/consumption",consumption_publish)
         i=i+1
-    x = np.arange(len(arr_con))
-    plt.plot(x,arr_con,label="consumption")
-    plt.plot(x,arr_prod,label="production")
-    plt.xlabel("time of the day in hours")
-    plt.ylabel("energy")
-    plt.legend()
-    plt.show()
+
+    # plotting details - commented for later reuse
+    # x = np.arange(len(arr_con))
+    # plt.plot(x,arr_con,label="consumption")
+    # plt.plot(x,arr_prod,label="production")
+    # plt.xlabel("time of the day in hours")
+    # plt.ylabel("energy")
+    # plt.legend()
+    # plt.show()
 
     
 main()

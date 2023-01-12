@@ -4,22 +4,21 @@ import time
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import numpy as np
-# The callback for when the client receives a CONNACK response from the server.
+
+#global arrays for the plotting 
+globalArr_time = []
+globalArr_production = []
+
 def on_connect(client, userdata, flags, rc):
+    """The callback for when the client receives a CONNACK response from the server."""
     print("Connected with result code "+str(rc))
-    
     # Subscribing in on_connect() means that if we lose the connection and
     # reconnect then subscriptions will be renewed.
     client.subscribe("prediction/production")
     client.subscribe("prediction/consumption")
 
-# fig = plt.figure()
-# ax = fig.add_subplot(1, 1, 1)
-globalArr_time = []
-globalArr_production = []
-
-# The callback for when a PUBLISH message is received from the server.
 def on_message(client, userdata, msg):
+    """The callback for when a PUBLISH message is received from the server."""
     global globalArr_time
     global globalArr_production
     global fig
@@ -59,18 +58,8 @@ def on_message(client, userdata, msg):
         plt.tight_layout()
         plt.draw()
         plt.pause(0.1)
-        
 
-
-
-    # Format plot
-
-
-
-    
-
-   
-    
+# Instatiate Mosquitto 
 client = mqtt.Client()
 username = 'mosquittoBroker'
 password = 'se4gd'
@@ -78,16 +67,8 @@ client.username_pw_set(username, password)
 client.on_connect = on_connect
 client.on_message = on_message
 client.connect("localhost", 1883, 60)
-plt.show(block=True) 
-
 # block=True lets the window stay open at the end of the animation.
 # Blocking call that processes network traffic, dispatches callbacks and
 # handles reconnecting.
-# Other loop*() functions are available that give a threaded interface and a
-# # manual interface.
-# client.loop_start()
-# time.sleep(4)
-# client.loop_stop()
+plt.show(block=True) 
 client.loop_forever()
-
-# test
